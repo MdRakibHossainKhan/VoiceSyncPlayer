@@ -26,8 +26,6 @@
             android:id="@+id/addVideoAnimationView"
             android:layout_width="75dp"
             android:layout_height="75dp"
-            android:layout_marginTop="@dimen/margin_mid"
-            android:layout_marginEnd="@dimen/margin_mid"
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintTop_toTopOf="parent"
             app:lottie_autoPlay="true"
@@ -48,8 +46,8 @@
 
         <VideoView
             android:id="@+id/videoView"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
             android:visibility="invisible"
             app:layout_constraintBottom_toBottomOf="parent"
             app:layout_constraintEnd_toEndOf="parent"
@@ -71,7 +69,8 @@
             android:layout_height="wrap_content"
             android:layout_gravity="center_vertical"
             android:layout_weight="1"
-            android:hint="@string/star_time">
+            android:hint="@string/star_time"
+            android:visibility="invisible">
 
             <com.google.android.material.textfield.TextInputEditText
                 android:layout_width="match_parent"
@@ -89,7 +88,8 @@
             android:layout_gravity="center_vertical"
             android:layout_marginStart="@dimen/margin_mid"
             android:layout_weight="1"
-            android:hint="@string/end_time">
+            android:hint="@string/end_time"
+            android:visibility="invisible">
 
             <com.google.android.material.textfield.TextInputEditText
                 android:layout_width="match_parent"
@@ -104,6 +104,7 @@
             android:layout_width="75dp"
             android:layout_height="75dp"
             android:layout_marginStart="@dimen/margin_mid"
+            android:visibility="invisible"
             app:lottie_autoPlay="false"
             app:lottie_loop="true"
             app:lottie_rawRes="@raw/recording_animation" />
@@ -118,6 +119,7 @@
         android:layout_marginTop="@dimen/margin_mid"
         android:text="@string/play"
         android:textSize="@dimen/sub_title_text"
+        android:visibility="invisible"
         app:icon="@android:drawable/ic_media_play"
         app:iconGravity="textStart"
         app:iconSize="24dp" />
