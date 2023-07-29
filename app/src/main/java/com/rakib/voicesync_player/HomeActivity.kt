@@ -12,6 +12,7 @@ import android.os.Bundle
 import android.os.Handler
 import android.provider.MediaStore
 import android.view.View
+import android.view.inputmethod.InputMethodManager
 import android.widget.MediaController
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
@@ -90,6 +91,14 @@ class HomeActivity : AppCompatActivity() {
         }
     }
 
+    private fun hideKeyboard() {
+        val inputMethodManager = getSystemService(INPUT_METHOD_SERVICE) as InputMethodManager
+        inputMethodManager.hideSoftInputFromWindow(
+            currentFocus?.applicationWindowToken,
+            InputMethodManager.HIDE_NOT_ALWAYS
+        )
+    }
+
     private fun controlViewVisibility() {
         if (isVideoSelected) {
             binding.emptyVideoAnimationView.visibility = View.INVISIBLE
@@ -99,6 +108,7 @@ class HomeActivity : AppCompatActivity() {
             binding.recordingAnimationView.visibility = View.VISIBLE
 
             if (isAudioRecording) {
+                hideKeyboard()
                 binding.recordingAnimationView.playAnimation()
             } else {
                 binding.recordingAnimationView.pauseAnimation()
