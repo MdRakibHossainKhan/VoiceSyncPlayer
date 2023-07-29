@@ -4,7 +4,9 @@ import android.net.Uri
 
 object MediaMetaData {
     lateinit var sourceVideoUri: Uri
-    lateinit var outputAudioUri: Uri
+    var outputAudioPath: String = ""
     var videoDurationInSec: Int = 0
     var videoSizeInKB: Int = 0
+    var audioStartTime: Int = 0
+    var audioEndTime: Int = 0
 }

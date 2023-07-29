@@ -1,14 +1,15 @@
 package com.rakib.voicesync_player
 
+import android.annotation.SuppressLint
 import android.app.Activity
 import android.content.Intent
 import android.content.pm.ActivityInfo
 import android.content.pm.PackageManager
-import android.media.MediaMetadataRetriever
-import android.media.MediaRecorder
+import android.media.MediaPlayer
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.os.Handler
 import android.provider.MediaStore
 import android.view.View
 import android.widget.MediaController
@@ -16,16 +17,23 @@ import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
+import com.rakib.voicesync_player.AppStatsData.isAudioRecorded
+import com.rakib.voicesync_player.AppStatsData.isAudioRecording
+import com.rakib.voicesync_player.AppStatsData.isVideoSelected
+import com.rakib.voicesync_player.MediaMetaData.audioEndTime
+import com.rakib.voicesync_player.MediaMetaData.audioStartTime
+import com.rakib.voicesync_player.MediaMetaData.outputAudioPath
+import com.rakib.voicesync_player.MediaMetaData.sourceVideoUri
 import com.rakib.voicesync_player.databinding.ActivityHomeBinding
-import java.io.File
+import com.rakib.voicesync_player.utils.AudioRecorder
+import com.rakib.voicesync_player.utils.MediaUtils
 
 class HomeActivity : AppCompatActivity() {
+    private val context = this@HomeActivity
+    private var mediaUtils = MediaUtils(context)
     private lateinit var binding: ActivityHomeBinding
-    private lateinit var mediaController: MediaController
-    private lateinit var mediaRecorder: MediaRecorder
-    private var isVideoSelected = false
-    private var isAudioRecorded = false
 
+    @SuppressLint("SourceLockedOrientationActivity")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         binding = ActivityHomeBinding.inflate(layoutInflater)
@@ -37,7 +45,7 @@ class HomeActivity : AppCompatActivity() {
         // Request all permissions
         if (!allPermissionsGranted()) {
             ActivityCompat.requestPermissions(
-                this@HomeActivity,
+                context,
                 REQUIRED_PERMISSIONS,
                 REQUEST_CODE_PERMISSIONS
             )
@@ -45,6 +53,40 @@ class HomeActivity : AppCompatActivity() {
 
         binding.addVideoAnimationView.setOnClickListener {
             pickVideoFromStorage()
+        }
+
+        val audioRecorder = AudioRecorder(context)
+
+        binding.recordingAnimationView.setOnClickListener {
+            if (isAudioRecording) {
+                audioRecorder.stopRecording()
+                controlViewVisibility()
+            } else {
+                // Get start and end time
+                val startTimeString = binding.startTimeFilledTextField.editText?.text.toString()
+                val endTimeString = binding.endTimeFilledTextField.editText?.text.toString()
+
+                if (startTimeString.isNotEmpty() && endTimeString.isNotEmpty()) {
+                    audioStartTime = startTimeString.toInt()
+                    audioEndTime = endTimeString.toInt()
+
+                    if (audioRecorder.compareAudioWithVideo(audioStartTime, audioEndTime)) {
+                        audioRecorder.startRecording()
+                        controlViewVisibility()
+                    }
+                } else {
+                    Toast.makeText(
+                        context,
+                        "Provide valid start and end time.",
+                        Toast.LENGTH_LONG
+                    ).show()
+                }
+            }
+        }
+
+        binding.playButton.setOnClickListener {
+            val delayInMillis = audioStartTime * 1000
+            playVideoWithVoiceOver(sourceVideoUri, outputAudioPath, delayInMillis.toLong())
         }
     }
 
@@ -56,8 +98,14 @@ class HomeActivity : AppCompatActivity() {
             binding.endTimeFilledTextField.visibility = View.VISIBLE
             binding.recordingAnimationView.visibility = View.VISIBLE
 
-            if (isAudioRecorded) {
-                binding.playButton.visibility = View.VISIBLE
+            if (isAudioRecording) {
+                binding.recordingAnimationView.playAnimation()
+            } else {
+                binding.recordingAnimationView.pauseAnimation()
+
+                if (isAudioRecorded) {
+                    binding.playButton.visibility = View.VISIBLE
+                }
             }
         }
     }
@@ -71,41 +119,50 @@ class HomeActivity : AppCompatActivity() {
         super.onActivityResult(requestCode, resultCode, data)
 
         if (requestCode == REQUEST_CODE_PICK_VIDEO && resultCode == Activity.RESULT_OK) {
-            MediaMetaData.sourceVideoUri = data?.data!!
-
-            getVideoStats(MediaMetaData.sourceVideoUri)
-
+            sourceVideoUri = data?.data!!
+            mediaUtils.getVideoStats(sourceVideoUri)
             isVideoSelected = true
             controlViewVisibility()
+            playVideo(sourceVideoUri)
         }
     }
 
-    private fun getVideoStats(videoUri: Uri) {
-        val retriever = MediaMetadataRetriever()
-        retriever.setDataSource(this@HomeActivity, videoUri)
-
-        MediaMetaData.videoDurationInSec =
-            retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)!!.toInt() / 1000
-        MediaMetaData.videoSizeInKB = File(videoUri.path!!).length().toInt() / 1024
-
-        playVideo(MediaMetaData.sourceVideoUri)
-
-        Toast.makeText(
-            this@HomeActivity, "Duration: ${MediaMetaData.videoDurationInSec} s\n" +
-                    "Size: ${MediaMetaData.videoSizeInKB} KB", Toast.LENGTH_LONG
-        ).show()
+    private fun playVideo(videoUri: Uri) {
+        val mediaController = MediaController(this)
+        mediaController.apply {
+            setAnchorView(binding.videoView)
+            binding.videoView.setMediaController(mediaController)
+            binding.videoView.setVideoURI(videoUri)
+            binding.videoView.start()
+        }
     }
 
-    private fun playVideo(videoUri: Uri) {
-        mediaController = MediaController(this@HomeActivity)
-        mediaController.setAnchorView(binding.videoView)
-        binding.videoView.setMediaController(mediaController)
+    private fun playVideoWithVoiceOver(videoPath: Uri, voiceOverPath: String, delayInMillis: Long) {
+        val mediaPlayer = MediaPlayer()
+        mediaPlayer.apply {
+            setDataSource(context, videoPath)
+            setOnPreparedListener {
+                binding.videoView.start()
+            }
+            prepareAsync()
+        }
 
-        // Set the video URI to the VideoView
-        binding.videoView.setVideoURI(videoUri)
+        mediaPlayer.setOnSeekCompleteListener {
+            mediaPlayer.apply {
+                reset()
+                setDataSource(voiceOverPath)
+                setOnPreparedListener {
+                    start()
+                }
+                prepareAsync()
+            }
+        }
 
-        // Start video playback
-        binding.videoView.start()
+        // Calculate the delay based on user input (start and end time) and adjust playback accordingly
+        Handler().postDelayed({
+            mediaPlayer.seekTo(0) // Reset the video playback to the beginning before playing the voice-over
+            mediaPlayer.start()
+        }, delayInMillis)
     }
 
     // Process result from permission request dialog box
@@ -117,9 +174,9 @@ class HomeActivity : AppCompatActivity() {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
 
         if (requestCode == REQUEST_CODE_PERMISSIONS && allPermissionsGranted()) {
-            Toast.makeText(this@HomeActivity, "Permission Allowed", Toast.LENGTH_LONG).show()
+            Toast.makeText(context, "Permission Allowed", Toast.LENGTH_LONG).show()
         } else {
-            Toast.makeText(this@HomeActivity, "Permission Denied", Toast.LENGTH_LONG).show()
+            Toast.makeText(context, "Permission Denied", Toast.LENGTH_LONG).show()
             finish()
         }
     }
@@ -127,7 +184,7 @@ class HomeActivity : AppCompatActivity() {
     // Check if all permissions specified in the manifest have been granted
     private fun allPermissionsGranted() = REQUIRED_PERMISSIONS.all {
         ContextCompat.checkSelfPermission(
-            this@HomeActivity,
+            context,
             it
         ) == PackageManager.PERMISSION_GRANTED
     }
